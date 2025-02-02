@@ -1,5 +1,6 @@
 # Dinamik dosyalar
 camera_outputs/
+decision/yolo/
 
 # IDE veya sistem dosyaları
 *.log
