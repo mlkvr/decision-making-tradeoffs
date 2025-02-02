@@ -1,6 +1,8 @@
 import carla
 import math
 
+global isWalked
+
 def spawn_walker(world, blueprint_library):
     """
     Spawns a walker at a location relative to the ego vehicle spawn point.

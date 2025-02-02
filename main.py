@@ -1,10 +1,10 @@
 import carla
+import cv2
 from config.settings import setup_carla_client
 from actors.ego_vehicle import spawn_ego_vehicle
-from actors.walker import spawn_walker, compute_jaywalk_waypoints, force_jaywalk_path
+from actors.walker import spawn_walker, compute_jaywalk_waypoints
 from decision.decision_logic import process_decision
 from sensors.camera import attach_camera
-import cv2
 
 def main():
     global ego_vehicle, walker, walker_controller, camera
@@ -25,46 +25,54 @@ def main():
             print("Error: Walker could not be spawned!")
             return
 
-        # Optionally, you can spawn and start the walker controller to get natural animations.
-        # However, if the navigation mesh prevents the walker from going out of bounds,
-        # the controller may override your destination. In this approach, we use it briefly
-        # for animation, then force the path manually.
+        # Optionally, start the walker controller briefly for natural animations, then disable it.
         walker_controller_bp = blueprint_library.find('controller.ai.walker')
         walker_controller = world.try_spawn_actor(walker_controller_bp, carla.Transform(), attach_to=walker)
         if walker_controller is not None:
             walker_controller.start()
-        else:
-            print("Warning: Walker controller could not be spawned!")
-            walker_controller = None
-
-        # Compute a series of waypoints for jaywalking.
-        # Use the walker's current location as the starting point.
-        start_location = walker.get_location()
-        waypoints = compute_jaywalk_waypoints(start_location, num_waypoints=15, step_distance=1.0, lateral_offset=10.0)
-
-        if walker_controller is not None:
+            # Let it run briefly to play natural animations
+            for _ in range(10):
+                world.tick()
             walker_controller.stop()
             walker_controller.destroy()
             walker_controller = None
             print("Walker controller disabled before forcing path.")
 
-       
-        # Optionally, attach a camera to the ego vehicle.
+        # Compute a series of waypoints for jaywalking.
+        start_location = walker.get_location()
+        waypoints = compute_jaywalk_waypoints(start_location, num_waypoints=15, step_distance=1.0, lateral_offset=10.0)
+
+        # Attach a camera to the ego vehicle
         camera = attach_camera(world, ego_vehicle)
         if camera is None:
             print("Error: Camera could not be attached!")
             return
 
-        # Process decision logic, etc.
-        process_decision(ego_vehicle, walker)
-
-         # Force the walker along the computed jaywalking path.
-        force_jaywalk_path(world, walker, waypoints, tick_delay=10)
-
-        # Run the simulation loop; here we wait until the user presses 'q' to exit.
+        # Simulation loop: update both the walker and the car concurrently.
+        current_waypoint_index = 0
+        tick_counter = 0
+        tick_delay = 2  # update the walker position every tick_delay ticks
         running = True
+
         while running:
             world.tick()
+            tick_counter += 1
+
+            # If there are still waypoints left for the walker, update its position gradually.
+            if current_waypoint_index < len(waypoints) and tick_counter % tick_delay == 0:
+                # Force the walker to the next waypoint using set_transform (updates both location and rotation)
+                new_transform = carla.Transform(
+                    location=waypoints[current_waypoint_index],
+                    rotation=walker.get_transform().rotation
+                )
+                walker.set_transform(new_transform)
+                print(f"Walker forced to waypoint {current_waypoint_index+1}: {waypoints[current_waypoint_index]}")
+                current_waypoint_index += 1
+
+            # Process decision logic concurrently (using sensor data)
+            process_decision(ego_vehicle)
+
+            # Check for exit condition (press 'q' in the OpenCV window)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 print("Exiting simulation via 'q'.")
                 running = False
@@ -83,10 +91,6 @@ def main():
         if walker is not None:
             walker.destroy()
             print("walker destroyed")
-        if walker_controller is not None:
-            walker_controller.stop()
-            walker_controller.destroy()
-            print("walker_controller destroyed")
         if camera is not None:
             camera.stop()
             camera.destroy()
