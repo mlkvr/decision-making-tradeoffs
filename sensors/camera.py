@@ -28,7 +28,6 @@ def process_image(image):
     import global_data
     global_data.last_camera_image = array[:, :, :3]
     
-    print(f"Received frame {image.frame}: shape = {array.shape[:-1]}, dtype = {array.dtype}")
     cv2.imshow("Camera View", array[:, :, :3])
     cv2.waitKey(1)
 

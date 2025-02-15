@@ -2,9 +2,9 @@ import cv2
 import numpy as np
 
 # Update these paths as needed (ensure they point to the correct files)
-YOLO_CONFIG_PATH = "decision/yolov3.cfg"
-YOLO_WEIGHTS_PATH = "decision/yolov3.weights"
-YOLO_CLASSES_PATH = "decision/coco.names"
+YOLO_CONFIG_PATH = "decision/yolo/yolov3.cfg"
+YOLO_WEIGHTS_PATH = "decision/yolo/yolov3.weights"
+YOLO_CLASSES_PATH = "decision/yolo/coco.names"
 
 # Load the COCO class labels
 with open(YOLO_CLASSES_PATH, "r") as f:

@@ -40,7 +40,7 @@ def main():
 
         # Compute a series of waypoints for jaywalking.
         start_location = walker.get_location()
-        waypoints = compute_jaywalk_waypoints(start_location, num_waypoints=15, step_distance=1.0, lateral_offset=10.0)
+        waypoints = compute_jaywalk_waypoints(start_location, num_waypoints=10, step_distance=1.0, lateral_offset=10.0)
 
         # Attach a camera to the ego vehicle
         camera = attach_camera(world, ego_vehicle)
@@ -51,7 +51,7 @@ def main():
         # Simulation loop: update both the walker and the car concurrently.
         current_waypoint_index = 0
         tick_counter = 0
-        tick_delay = 2  # update the walker position every tick_delay ticks
+        tick_delay = 1  # update the walker position every tick_delay ticks
         running = True
 
         while running:
