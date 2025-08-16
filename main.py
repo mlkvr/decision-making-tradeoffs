@@ -4,7 +4,7 @@ from config.settings import setup_carla_client
 from actors.ego_vehicle import spawn_ego_vehicle
 from actors.walker import spawn_walker, compute_jaywalk_waypoints
 from sensors.camera import attach_camera
-from utils.deepseek_integration import run_deepseek_decision
+from decision.decision_logic import process_decision
 
 def main():
     global ego_vehicle, walker, walker_controller, camera
@@ -48,7 +48,7 @@ def main():
     tick_delay = 1
     running = True
 
-    print("\n--- Manuel tick mode aktif! Devam etmek için Enter, çıkmak için q+Enter ---")
+    print("\n--- YOLO tabanlı otonom mod aktif! Devam etmek için Enter, çıkmak için q+Enter ---")
     try:
         while running:
             user_input = input("Devam etmek için Enter'a bas, çıkmak için q+Enter: ")
@@ -57,20 +57,8 @@ def main():
                 running = False
                 break
 
-            # Karar mantığı
-            description = "A pedestrian is crossing in front of the car."
-            print("LLava description:", description)
-
-            decision = run_deepseek_decision(description)
-            if decision == "brake":
-                ego_vehicle.apply_control(carla.VehicleControl(throttle=0.0, brake=1.0))
-                print("Emergency braking applied!")
-            elif decision == "accelerate":
-                ego_vehicle.apply_control(carla.VehicleControl(throttle=0.5, brake=0.0))
-                print("Accelerating...")
-            else:
-                ego_vehicle.apply_control(carla.VehicleControl(throttle=0.0, brake=0.0))
-                print("Continuing on path.")
+            # YOLO tabanlı karar mantığını çağır
+            process_decision(ego_vehicle)
 
             world.tick()
             tick_counter += 1

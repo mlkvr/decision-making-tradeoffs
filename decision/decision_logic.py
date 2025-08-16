@@ -1,44 +1,44 @@
-import time
 import carla
-import cv2
-from .pedestrian_detector import detect_pedestrians, pedestrian_in_path
 import global_data
+import numpy as np
 
-def estimate_distance(bbox_width, actual_width=0.6, focal_length=400):
-    if bbox_width == 0:
+SPEED_LIMIT = 50.0
+MIN_BRAKING_DISTANCE = 10.0
+BRAKING_DISTANCE_FACTOR = 0.6
+
+def calculate_dynamic_braking_distance(speed_kmh):
+    return max(MIN_BRAKING_DISTANCE, speed_kmh * BRAKING_DISTANCE_FACTOR)
+
+def get_pedestrian_distance_from_lidar(lidar_points):
+    if len(lidar_points) == 0:
         return float('inf')
-    return (actual_width * focal_length) / bbox_width
 
-def process_decision(ego_vehicle):
-    computation_time = 1.0  # seconds
-    start_time = time.time()
-    
-    pedestrian_detected = False
-    braking_distance_threshold = 15.0  # Only brake if pedestrian is closer than 15 m
-    
-    while time.time() - start_time < computation_time:
-        if global_data.last_camera_image is not None:
-            detections = detect_pedestrians(global_data.last_camera_image, conf_threshold=0.3)
-            image_width = global_data.last_camera_image.shape[1]
-            # Instead of simply checking if a pedestrian is in path,
-            # check the estimated distance for each detection.
-            for det in detections:
-                x, y, w, h = det["bbox"]
-                est_distance = estimate_distance(w)
-                print(f"Estimated distance: {est_distance:.2f} m (bbox width: {w})")
-                # You can also check if the detection is in the central region if desired:
-                if est_distance < braking_distance_threshold:
-                    pedestrian_detected = True
-                    break
-            if pedestrian_detected:
-                break
-        else:
-            print("No frame available yet.")
-        time.sleep(0.1)
+    points = lidar_points[:, :3]
+    forward_points = points[(points[:, 0] > 0)]
 
-    if pedestrian_detected:
+    if len(forward_points) == 0:
+        return float('inf')
+
+    distances = np.linalg.norm(forward_points, axis=1)
+    min_distance = np.min(distances)
+
+    return min_distance
+
+def process_decision(ego_vehicle, lidar_data_points):
+    velocity = ego_vehicle.get_velocity()
+    current_speed = 3.6 * (velocity.x**2 + velocity.y**2 + velocity.z**2)**0.5
+    dynamic_braking_distance = calculate_dynamic_braking_distance(current_speed)
+
+    pedestrian_distance = get_pedestrian_distance_from_lidar(lidar_data_points)
+
+    print(f"Araç Hızı: {current_speed:.2f} km/h, Fren Mesafesi: {dynamic_braking_distance:.2f} m")
+    print(f"LIDAR ile ölçülen gerçek yaya mesafesi: {pedestrian_distance:.2f} m")
+
+    if pedestrian_distance < dynamic_braking_distance:
+        print(f"Tehlike! Yayaya mesafe {pedestrian_distance:.2f} m. Fren yapılıyor.")
         ego_vehicle.apply_control(carla.VehicleControl(throttle=0.0, brake=1.0))
-        print("Emergency braking applied!")
+    elif current_speed > SPEED_LIMIT:
+        print("Hız limiti aşıldı, hız düşürülüyor!")
+        ego_vehicle.apply_control(carla.VehicleControl(throttle=0.0, brake=0.3))
     else:
         ego_vehicle.apply_control(carla.VehicleControl(throttle=0.5, brake=0.0))
-        print("Continuing on path.")
